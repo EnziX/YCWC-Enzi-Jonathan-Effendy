@@ -1,19 +1,16 @@
 /**
  * chatWidget.js
  * ──────────────────────────────────────────────
- * Floating AI Chat Widget using Gemini API.
- * Provides personalized responses based on user profile, macros, and food log.
+ * Floating Offline AI Chat Widget.
+ * Provides personalized responses based on user profile, macros, and local database.
  */
 
-import { getState, getTodayConsumed } from '../state.js';
 import { getIcon } from '../icons.js';
-
-// Default key for local dev/testing as provided by user
-const DEFAULT_GEMINI_KEY = 'XXX';
+import { getOfflineAiResponse } from '../offlineAiAgent.js';
 
 let isChatOpen = false;
 let messages = [
-  { role: 'ai', content: "Hello! I am your Nutri+ AI assistant. Ask me anything about your nutrition targets, meal recommendations, or health tips!" }
+  { role: 'ai', content: "Halo! Saya Nutri+ AI Agent (Offline Mode). Ada yang bisa saya bantu terkait nutrisi, sisa kalori, rekomendasi makanan, atau resep hari ini?" }
 ];
 
 export function renderChatWidget(container) {
@@ -25,7 +22,7 @@ export function renderChatWidget(container) {
   }
 
   widgetContainer.innerHTML = `
-    <button id="btn-chat-fab" class="chat-fab" title="Chat with Nutri+ AI">
+    <button id="btn-chat-fab" class="chat-fab" title="Chat with Nutri+ AI (Offline)">
       ${isChatOpen ? getIcon('X', 24) : getIcon('Bot', 26)}
     </button>
 
@@ -34,7 +31,10 @@ export function renderChatWidget(container) {
         <div class="chat-header">
           <div class="flex items-center gap-2">
             <div class="ai-core" style="width: 20px; height: 20px;"></div>
-            <span class="font-heading font-bold text-sm">Nutri+ AI Agent</span>
+            <div class="flex flex-col">
+              <span class="font-heading font-bold text-sm">Nutri+ AI Agent</span>
+              <span class="text-xs text-muted" style="font-size: 0.68rem; color: var(--color-success);">● Offline Engine Active</span>
+            </div>
           </div>
           <button id="btn-close-chat" class="glass-button p-1" style="padding: 0.2rem 0.4rem;">
             ${getIcon('X', 16)}
@@ -44,13 +44,21 @@ export function renderChatWidget(container) {
         <div id="chat-messages" class="chat-messages">
           ${messages.map((msg) => `
             <div class="chat-bubble ${msg.role}">
-              ${msg.content.replace(/\n/g, '<br/>')}
+              ${formatMarkdownText(msg.content)}
             </div>
           `).join('')}
         </div>
 
+        <!-- Quick Prompt Chips -->
+        <div class="chat-chips-area">
+          <button class="chip-btn" data-query="Berapa sisa kalori saya hari ini?">📊 Sisa Kalori</button>
+          <button class="chip-btn" data-query="Rekomendasi makan siang sehat">🥗 Rekomendasi Makan</button>
+          <button class="chip-btn" data-query="Makanan tinggi protein">🥩 Tinggi Protein</button>
+          <button class="chip-btn" data-query="Tips menurunkan berat badan">💡 Tips Diet</button>
+        </div>
+
         <form id="form-chat-send" class="chat-input-area">
-          <input type="text" id="chat-input-text" class="glass-input" placeholder="Ask Nutri+ AI..." autocomplete="off" />
+          <input type="text" id="chat-input-text" class="glass-input" placeholder="Tanyakan nutrisi, kalori, resep..." autocomplete="off" />
           <button type="submit" class="glass-button primary p-2" style="padding: 0.5rem 0.8rem;">
             ${getIcon('Send', 18)}
           </button>
@@ -63,6 +71,7 @@ export function renderChatWidget(container) {
   const fab = widgetContainer.querySelector('#btn-chat-fab');
   const closeBtn = widgetContainer.querySelector('#btn-close-chat');
   const chatForm = widgetContainer.querySelector('#form-chat-send');
+  const chipBtns = widgetContainer.querySelectorAll('.chip-btn');
 
   if (fab) {
     fab.addEventListener('click', () => {
@@ -79,39 +88,49 @@ export function renderChatWidget(container) {
     });
   }
 
+  if (chipBtns) {
+    chipBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const query = btn.getAttribute('data-query');
+        if (query) sendUserMessage(query, container);
+      });
+    });
+  }
+
   if (chatForm) {
-    chatForm.addEventListener('submit', async (e) => {
+    chatForm.addEventListener('submit', (e) => {
       e.preventDefault();
       const input = widgetContainer.querySelector('#chat-input-text');
       const query = input.value.trim();
       if (!query) return;
-
-      // Add user message
-      messages.push({ role: 'user', content: query });
       input.value = '';
-      renderChatWidget(container);
-      scrollToBottom();
-
-      // Show typing indicator
-      messages.push({ role: 'ai', content: 'Thinking...' });
-      renderChatWidget(container);
-      scrollToBottom();
-
-      try {
-        const reply = await callGeminiAPI(query);
-        // Replace typing indicator with reply
-        messages[messages.length - 1] = { role: 'ai', content: reply };
-      } catch (err) {
-        messages[messages.length - 1] = {
-          role: 'ai',
-          content: 'Sorry, I encountered an issue connecting to Gemini. Please verify your API key or connection.'
-        };
-      }
-
-      renderChatWidget(container);
-      scrollToBottom();
+      sendUserMessage(query, container);
     });
   }
+}
+
+async function sendUserMessage(query, container) {
+  messages.push({ role: 'user', content: query });
+  renderChatWidget(container);
+  scrollToBottom();
+
+  // Show typing indicator
+  messages.push({ role: 'ai', content: 'Memproses kecerdasan nutrisi...' });
+  renderChatWidget(container);
+  scrollToBottom();
+
+  try {
+    const reply = await getOfflineAiResponse(query);
+    messages[messages.length - 1] = { role: 'ai', content: reply };
+  } catch (err) {
+    messages[messages.length - 1] = {
+      role: 'ai',
+      content: 'Maaf, terjadi kesalahan pada engine lokal. Silakan coba pertanyaan lain.'
+    };
+  }
+
+  renderChatWidget(container);
+  scrollToBottom();
 }
 
 function scrollToBottom() {
@@ -121,48 +140,11 @@ function scrollToBottom() {
   }
 }
 
-async function callGeminiAPI(userQuery) {
-  const state = getState();
-  const todayConsumed = getTodayConsumed();
-  const { profile, nutrition, preferences } = state;
-
-  const systemContext = `
-You are Nutri+ AI, a smart nutrition and health agent assistant.
-User Profile context:
-- Age: ${profile.age || 'N/A'}, Gender: ${profile.gender || 'N/A'}, Height: ${profile.height || 'N/A'}cm, Weight: ${profile.weight || 'N/A'}kg
-- Goal: ${profile.goal || 'N/A'}, Activity Level: ${profile.activityLevel || 'N/A'}
-- Dietary Preferences: ${preferences?.join(', ') || 'None'}
-- Target Calories: ${nutrition.macros?.calories || 0} kcal (Protein: ${nutrition.macros?.protein}g, Carbs: ${nutrition.macros?.carbs}g, Fat: ${nutrition.macros?.fat}g)
-- Consumed Today: ${todayConsumed.calories} kcal (Protein: ${todayConsumed.protein}g, Carbs: ${todayConsumed.carbs}g, Fat: ${todayConsumed.fat}g)
-
-Provide concise, friendly, encouraging, and accurate nutritional advice matching their goals and preferences. Keep answers clear and actionable.
-  `;
-
-  const apiKey = DEFAULT_GEMINI_KEY;
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
-  const payload = {
-    contents: [
-      {
-        parts: [
-          { text: systemContext },
-          { text: `User Question: ${userQuery}` }
-        ]
-      }
-    ]
-  };
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  if (!response.ok) {
-    throw new Error(`API error ${response.status}`);
-  }
-
-  const data = await response.json();
-  const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
-  return text || "I'm here to help with your nutrition! Could you rephrase your question?";
+function formatMarkdownText(text) {
+  if (!text) return '';
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+    .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/\n/g, '<br/>');
 }
+

@@ -15,15 +15,20 @@ export function renderSidebar(currentPath) {
   const isActive = (path) => currentPath === path ? 'active' : '';
 
   return `
-    <aside class="sidebar">
+    <aside class="sidebar" id="app-sidebar">
       <div class="flex items-center justify-between mb-6 px-2">
         <div class="flex items-center gap-3">
           <div class="ai-core" style="width: 28px; height: 28px; animation: none;"></div>
           <h2 class="text-gradient" style="font-size: 1.3rem;">Nutri+</h2>
         </div>
-        <button id="btn-theme-toggle" class="glass-button p-2" title="Toggle Light/Dark Theme" style="padding: 0.4rem; border-radius: 50%;">
-          ${currentTheme === 'light' ? getIcon('Moon', 18) : getIcon('Sun', 18)}
-        </button>
+        <div class="flex items-center gap-2">
+          <button id="btn-theme-toggle" class="glass-button p-2" title="Toggle Light/Dark Theme" style="padding: 0.4rem; border-radius: 50%;">
+            ${currentTheme === 'light' ? getIcon('Moon', 18) : getIcon('Sun', 18)}
+          </button>
+          <button id="btn-close-sidebar" class="glass-button p-2 mobile-only-btn" title="Close Navigation" style="padding: 0.4rem; border-radius: 50%;">
+            ${getIcon('X', 18)}
+          </button>
+        </div>
       </div>
 
       <nav class="flex flex-col flex-1">
@@ -100,4 +105,34 @@ export function attachSidebarListeners(container) {
       toggleTheme();
     });
   }
+
+  const closeBtn = container.querySelector('#btn-close-sidebar');
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => {
+      closeMobileSidebar();
+    });
+  }
+
+  // Close mobile sidebar automatically when a nav link is clicked
+  const navLinks = container.querySelectorAll('.nav-link');
+  navLinks.forEach((link) => {
+    link.addEventListener('click', () => {
+      closeMobileSidebar();
+    });
+  });
 }
+
+export function openMobileSidebar() {
+  const sidebar = document.getElementById('app-sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.classList.add('open');
+  if (overlay) overlay.classList.add('active');
+}
+
+export function closeMobileSidebar() {
+  const sidebar = document.getElementById('app-sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar) sidebar.classList.remove('open');
+  if (overlay) overlay.classList.remove('active');
+}
+
