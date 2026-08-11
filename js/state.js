@@ -3,16 +3,17 @@
  * ──────────────────────────────────────────────
  * Global state management for Nutri+ using Vanilla JavaScript.
  * Persists to localStorage under 'nutri-plus-state'.
- * Provides an event listener subscription system so UI re-renders on change.
  */
 
 import { calculateFullProfile, calculateWaterIntake } from './nutritionCalculator.js';
 import { generateMealPlan } from './mealPlanner.js';
 
 const STORAGE_KEY = 'nutri-plus-state';
+const THEME_KEY = 'nutri-plus-theme';
 
 const initialState = {
   isOnboarded: false,
+  theme: 'dark',
   profile: {
     age: null,
     gender: null,
@@ -33,6 +34,7 @@ const initialState = {
   mealPlan: null,
   foodLog: {},
   streak: { current: 0, best: 0, lastDate: null },
+  attendingEvents: [],
 };
 
 let state = { ...initialState };
@@ -45,6 +47,11 @@ function loadState() {
       const parsed = JSON.parse(saved);
       state = { ...initialState, ...parsed };
     }
+    const savedTheme = localStorage.getItem(THEME_KEY);
+    if (savedTheme) {
+      state.theme = savedTheme;
+    }
+    applyTheme(state.theme);
   } catch (err) {
     console.warn('Nutri+: Could not load saved state', err);
   }
@@ -53,17 +60,21 @@ function loadState() {
 function saveState() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    localStorage.setItem(THEME_KEY, state.theme);
   } catch (err) {
     console.warn('Nutri+: Could not save state', err);
   }
   notify();
 }
 
+function applyTheme(themeMode) {
+  document.documentElement.setAttribute('data-theme', themeMode);
+}
+
 function notify() {
   listeners.forEach((listener) => listener(state));
 }
 
-// Initial state load
 loadState();
 
 export function subscribe(listener) {
@@ -73,6 +84,22 @@ export function subscribe(listener) {
 
 export function getState() {
   return state;
+}
+
+export function getTheme() {
+  return state.theme || 'dark';
+}
+
+export function toggleTheme() {
+  state.theme = state.theme === 'light' ? 'dark' : 'light';
+  applyTheme(state.theme);
+  saveState();
+}
+
+export function setTheme(mode) {
+  state.theme = mode;
+  applyTheme(state.theme);
+  saveState();
 }
 
 export function todayKey() {
@@ -210,6 +237,16 @@ export function logWater(ml) {
   saveState();
 }
 
+export function toggleAttendEvent(eventId) {
+  const attending = state.attendingEvents || [];
+  if (attending.includes(eventId)) {
+    state.attendingEvents = attending.filter((id) => id !== eventId);
+  } else {
+    state.attendingEvents = [...attending, eventId];
+  }
+  saveState();
+}
+
 function updateStreakInternal() {
   const today = todayKey();
   const { lastDate, current, best } = state.streak;
@@ -242,5 +279,6 @@ export function updateStreak() {
 export function resetAll() {
   localStorage.removeItem(STORAGE_KEY);
   state = JSON.parse(JSON.stringify(initialState));
+  applyTheme(state.theme);
   notify();
 }

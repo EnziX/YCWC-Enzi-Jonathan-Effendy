@@ -6,6 +6,17 @@
 
 import { foodDatabase, getFoodsByMeal } from './data.js';
 
+export const ALL_DIETARY_PREFERENCES = [
+  { id: 'vegetarian', label: 'Vegetarian', desc: 'No meat, poultry, or seafood' },
+  { id: 'vegan', label: 'Vegan', desc: 'Strictly plant-based' },
+  { id: 'halal', label: 'Halal', desc: 'Halal compliant foods' },
+  { id: 'gluten-free', label: 'Gluten-Free', desc: 'No wheat or gluten' },
+  { id: 'lactose-free', label: 'Lactose-Free', desc: 'No dairy or lactose' },
+  { id: 'nut-free', label: 'Nut-Free', desc: 'No peanuts or tree nuts' },
+  { id: 'soy-free', label: 'Soy-Free', desc: 'No soybeans, tofu, or tempeh' },
+  { id: 'egg-free', label: 'Egg-Free', desc: 'No eggs or egg products' },
+];
+
 const MEAL_DISTRIBUTION = {
   breakfast: 0.25,
   lunch: 0.35,

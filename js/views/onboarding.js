@@ -5,6 +5,7 @@
  */
 
 import { ACTIVITY_LEVELS, GOALS } from '../nutritionCalculator.js';
+import { ALL_DIETARY_PREFERENCES } from '../mealPlanner.js';
 import { completeOnboarding } from '../state.js';
 
 let step = 1;
@@ -19,11 +20,7 @@ let profile = {
   goal: 'maintain',
 };
 
-let preferences = {
-  vegetarian: false,
-  halal: false,
-  lactoseFree: false,
-};
+let selectedPreferences = new Set();
 
 export function renderOnboarding(container, onCompleteNavigate) {
   if (loading) {
@@ -47,7 +44,7 @@ export function renderOnboarding(container, onCompleteNavigate) {
           <div class="flex flex-col gap-4">
             <div>
               <label class="block mb-2 text-sm text-muted">Age (years)</label>
-              <input type="number" id="input-age" class="glass-input" value="${profile.age}" placeholder="e.g. 25" />
+              <input type="number" id="input-age" class="glass-input" value="${profile.age}" placeholder="e.g. 25" min="1" max="120" />
             </div>
             <div>
               <label class="block mb-2 text-sm text-muted">Gender</label>
@@ -57,7 +54,7 @@ export function renderOnboarding(container, onCompleteNavigate) {
               </select>
             </div>
             <div class="flex justify-end mt-4">
-              <button id="btn-next-1" class="glass-button primary" ${!profile.age ? 'disabled' : ''}>Next</button>
+              <button id="btn-next-1" class="glass-button primary" ${!profile.age || Number(profile.age) <= 0 ? 'disabled' : ''}>Next</button>
             </div>
           </div>
         ` : ''}
@@ -66,11 +63,11 @@ export function renderOnboarding(container, onCompleteNavigate) {
           <div class="flex flex-col gap-4">
             <div>
               <label class="block mb-2 text-sm text-muted">Height (cm)</label>
-              <input type="number" id="input-height" class="glass-input" value="${profile.height}" placeholder="e.g. 170" />
+              <input type="number" id="input-height" class="glass-input" value="${profile.height}" placeholder="e.g. 170" min="50" max="250" />
             </div>
             <div>
               <label class="block mb-2 text-sm text-muted">Weight (kg)</label>
-              <input type="number" id="input-weight" class="glass-input" value="${profile.weight}" placeholder="e.g. 65" />
+              <input type="number" id="input-weight" class="glass-input" value="${profile.weight}" placeholder="e.g. 65" min="20" max="300" />
             </div>
             <div>
               <label class="block mb-2 text-sm text-muted">Activity Level</label>
@@ -84,7 +81,7 @@ export function renderOnboarding(container, onCompleteNavigate) {
             </div>
             <div class="flex justify-between mt-4">
               <button id="btn-back-2" class="glass-button">Back</button>
-              <button id="btn-next-2" class="glass-button primary" ${!profile.height || !profile.weight ? 'disabled' : ''}>Next</button>
+              <button id="btn-next-2" class="glass-button primary" ${!profile.height || !profile.weight || Number(profile.height) <= 0 || Number(profile.weight) <= 0 ? 'disabled' : ''}>Next</button>
             </div>
           </div>
         ` : ''}
@@ -102,20 +99,14 @@ export function renderOnboarding(container, onCompleteNavigate) {
               </select>
             </div>
             <div>
-              <label class="block mb-2 text-sm text-muted">Dietary Preferences</label>
-              <div class="flex flex-col gap-2">
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" id="chk-vegetarian" ${preferences.vegetarian ? 'checked' : ''} />
-                  Vegetarian
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" id="chk-halal" ${preferences.halal ? 'checked' : ''} />
-                  Halal
-                </label>
-                <label class="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" id="chk-lactose" ${preferences.lactoseFree ? 'checked' : ''} />
-                  Lactose-Free
-                </label>
+              <label class="block mb-2 text-sm text-muted">Dietary Preferences & Allergies</label>
+              <div class="grid grid-cols-2 gap-2" style="max-height: 180px; overflow-y: auto; padding-right: 4px;">
+                ${ALL_DIETARY_PREFERENCES.map((pref) => `
+                  <label class="flex items-center gap-2 cursor-pointer text-xs p-2 bg-slate-900/40 rounded border border-slate-800 hover:border-slate-700">
+                    <input type="checkbox" class="chk-pref" data-id="${pref.id}" ${selectedPreferences.has(pref.id) ? 'checked' : ''} />
+                    <span>${pref.label}</span>
+                  </label>
+                `).join('')}
               </div>
             </div>
             <div class="flex justify-between mt-4">
@@ -128,7 +119,6 @@ export function renderOnboarding(container, onCompleteNavigate) {
     </div>
   `;
 
-  // Attach listeners
   if (step === 1) {
     const ageInput = container.querySelector('#input-age');
     const genderSelect = container.querySelector('#input-gender');
@@ -136,7 +126,7 @@ export function renderOnboarding(container, onCompleteNavigate) {
 
     ageInput.addEventListener('input', (e) => {
       profile.age = e.target.value;
-      nextBtn.disabled = !profile.age;
+      nextBtn.disabled = !profile.age || Number(profile.age) <= 0;
     });
     genderSelect.addEventListener('change', (e) => {
       profile.gender = e.target.value;
@@ -153,7 +143,7 @@ export function renderOnboarding(container, onCompleteNavigate) {
     const nextBtn = container.querySelector('#btn-next-2');
 
     const checkValid = () => {
-      nextBtn.disabled = !profile.height || !profile.weight;
+      nextBtn.disabled = !profile.height || !profile.weight || Number(profile.height) <= 0 || Number(profile.weight) <= 0;
     };
 
     heightInput.addEventListener('input', (e) => {
@@ -177,34 +167,35 @@ export function renderOnboarding(container, onCompleteNavigate) {
     });
   } else if (step === 3) {
     const goalSelect = container.querySelector('#input-goal');
-    const vegChk = container.querySelector('#chk-vegetarian');
-    const halalChk = container.querySelector('#chk-halal');
-    const lacChk = container.querySelector('#chk-lactose');
+    const prefCheckboxes = container.querySelectorAll('.chk-pref');
     const backBtn = container.querySelector('#btn-back-3');
     const completeBtn = container.querySelector('#btn-complete');
 
     goalSelect.addEventListener('change', (e) => {
       profile.goal = e.target.value;
     });
-    vegChk.addEventListener('change', (e) => {
-      preferences.vegetarian = e.target.checked;
+
+    prefCheckboxes.forEach((chk) => {
+      chk.addEventListener('change', (e) => {
+        const id = e.target.getAttribute('data-id');
+        if (e.target.checked) {
+          selectedPreferences.add(id);
+        } else {
+          selectedPreferences.delete(id);
+        }
+      });
     });
-    halalChk.addEventListener('change', (e) => {
-      preferences.halal = e.target.checked;
-    });
-    lacChk.addEventListener('change', (e) => {
-      preferences.lactoseFree = e.target.checked;
-    });
+
     backBtn.addEventListener('click', () => {
       step = 2;
       renderOnboarding(container, onCompleteNavigate);
     });
+
     completeBtn.addEventListener('click', () => {
       loading = true;
       renderOnboarding(container, onCompleteNavigate);
 
       setTimeout(() => {
-        const prefsArray = Object.keys(preferences).filter((k) => preferences[k]);
         completeOnboarding(
           {
             ...profile,
@@ -212,10 +203,10 @@ export function renderOnboarding(container, onCompleteNavigate) {
             height: Number(profile.height),
             weight: Number(profile.weight),
           },
-          prefsArray
+          Array.from(selectedPreferences)
         );
         loading = false;
-        step = 1; // reset step for future
+        step = 1;
         if (onCompleteNavigate) onCompleteNavigate('#/dashboard');
       }, 2000);
     });
